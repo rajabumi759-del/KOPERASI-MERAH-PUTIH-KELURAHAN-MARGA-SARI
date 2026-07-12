@@ -23,7 +23,8 @@ export type ProgjaStatus =
   | 'DISETUJUI'
   | 'DILAKSANAKAN'
   | 'MENUNGGU_VALIDASI'
-  | 'DIPUBLIKASIKAN';
+  | 'DIPUBLIKASIKAN'
+  | 'MENUNGGU_VALIDASI_PENGHAPUSAN';
 
 export interface SubTask {
   id: string;

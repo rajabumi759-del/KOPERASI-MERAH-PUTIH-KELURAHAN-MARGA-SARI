@@ -489,6 +489,8 @@ export default function SirkulasiProgja({
         return { bg: 'bg-orange-50 text-orange-700 border border-orange-200', label: 'Menunggu Validasi', icon: <Clock className="w-3.5 h-3.5 text-orange-500 animate-pulse" /> };
       case 'DIPUBLIKASIKAN':
         return { bg: 'bg-teal-50 text-teal-700 border border-teal-200', label: 'Dipublikasikan (Publik)', icon: <Sparkles className="w-3.5 h-3.5" /> };
+      case 'MENUNGGU_VALIDASI_PENGHAPUSAN':
+        return { bg: 'bg-red-50 text-red-700 border border-red-200', label: 'Minta Hapus', icon: <Trash2 className="w-3.5 h-3.5 text-red-500 animate-pulse" /> };
     }
   };
 
@@ -562,7 +564,7 @@ export default function SirkulasiProgja({
 
       {/* Tabs Filter */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-slate-200">
-        {['SEMUA', 'DRAFT', 'DIAJUKAN', 'REVISI', 'DISETUJUI', 'DILAKSANAKAN', 'MENUNGGU_VALIDASI', 'DIPUBLIKASIKAN'].map((tab) => (
+        {['SEMUA', 'DRAFT', 'DIAJUKAN', 'REVISI', 'DISETUJUI', 'DILAKSANAKAN', 'MENUNGGU_VALIDASI', 'DIPUBLIKASIKAN', 'MENUNGGU_VALIDASI_PENGHAPUSAN'].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -572,7 +574,7 @@ export default function SirkulasiProgja({
                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
             }`}
           >
-            {tab === 'SEMUA' ? 'Semua Status' : tab === 'MENUNGGU_VALIDASI' ? 'Menunggu Validasi' : tab}
+            {tab === 'SEMUA' ? 'Semua Status' : tab === 'MENUNGGU_VALIDASI' ? 'Menunggu Validasi' : tab === 'MENUNGGU_VALIDASI_PENGHAPUSAN' ? 'Minta Hapus' : tab}
           </button>
         ))}
       </div>
@@ -671,17 +673,37 @@ export default function SirkulasiProgja({
                   >
                     <Printer className="w-4 h-4" />
                   </button>
-                  {currentUser.role === 'admin_master' && (
+                  {(currentUser.role === 'admin_master' || currentUser.role === 'ketua' || currentUser.nik === selectedProgja.picNik) && (
                     <button
                       onClick={() => {
-                        if (confirm('Apakah Anda yakin ingin menghapus progja ini?')) {
-                          onDeleteProgja(selectedProgja.id);
-                          onAddNotification(`Progja "${selectedProgja.title}" berhasil dihapus.`, 'warning');
-                          setSelectedProgja(null);
+                        const isAdminOrKetua = currentUser.role === 'admin_master' || currentUser.role === 'ketua';
+                        const isDraft = selectedProgja.status === 'DRAFT';
+                        
+                        if (isAdminOrKetua || isDraft) {
+                          if (confirm('Apakah Anda yakin ingin menghapus progja ini secara permanen?')) {
+                            onDeleteProgja(selectedProgja.id);
+                            onAddNotification(`Progja "${selectedProgja.title}" berhasil dihapus.`, 'warning');
+                            setSelectedProgja(null);
+                          }
+                        } else {
+                          if (confirm('Sebagai pengurus, Anda perlu mengajukan permohonan penghapusan program kerja ini untuk disetujui Ketua Koperasi. Ajukan permohonan penghapusan?')) {
+                            const updated: Progja = {
+                              ...selectedProgja,
+                              status: 'MENUNGGU_VALIDASI_PENGHAPUSAN',
+                              updatedAt: new Date().toISOString().split('T')[0],
+                            };
+                            onSaveProgja(updated);
+                            onAddNotification(`Permintaan penghapusan progja "${selectedProgja.title}" telah diajukan ke Ketua Koperasi.`, 'info');
+                            setSelectedProgja(updated);
+                          }
                         }
                       }}
                       className="p-2 text-slate-500 hover:text-red-600 bg-slate-100 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                      title="Hapus Progja"
+                      title={
+                        currentUser.role === 'admin_master' || currentUser.role === 'ketua' || selectedProgja.status === 'DRAFT'
+                          ? "Hapus Progja"
+                          : "Ajukan Penghapusan ke Ketua"
+                      }
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -1183,6 +1205,69 @@ export default function SirkulasiProgja({
                     ) : (
                       <p className="text-[10px] text-amber-600 italic">
                         *Menunggu Ketua Koperasi memvalidasi dan memberikan persetujuan (approve/reject) program kerja ini sebelum dapat dipublikasikan ke Portal Publik.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* KETUA ACTION: Approve Deletion / Reject Deletion (Only for MENUNGGU_VALIDASI_PENGHAPUSAN state) */}
+                {selectedProgja.status === 'MENUNGGU_VALIDASI_PENGHAPUSAN' && (
+                  <div className="p-4 bg-rose-50/50 rounded-xl border border-rose-200 space-y-4">
+                    <p className="text-xs font-bold text-rose-950 flex items-center gap-1.5">
+                      <Trash2 className="w-4 h-4 text-rose-600 animate-pulse" />
+                      Otorisasi Ketua: Permintaan Penghapusan Program Kerja
+                    </p>
+                    <p className="text-[11px] text-rose-800 leading-relaxed">
+                      Program kerja ini diusulkan untuk <span className="font-bold">dihapus</span> oleh Penanggung Jawab ({selectedProgja.picName}). Ketua Koperasi wajib memvalidasi alasan penghapusan.
+                    </p>
+
+                    <textarea
+                      value={reviewComment}
+                      onChange={(e) => setReviewComment(e.target.value)}
+                      placeholder="Masukkan catatan persetujuan atau alasan jika menolak permohonan penghapusan..."
+                      className="w-full p-2.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-rose-500 outline-hidden min-h-[80px]"
+                    />
+
+                    {currentUser.role === 'ketua' || currentUser.role === 'admin_master' ? (
+                      <div className="flex flex-wrap items-center gap-2 justify-end">
+                        <button
+                          onClick={() => {
+                            // Reject Deletion -> Revert back to DISETUJUI status
+                            const updated: Progja = {
+                              ...selectedProgja,
+                              status: 'DISETUJUI',
+                              notesFromKetua: reviewComment ? `Penolakan Penghapusan: ${reviewComment}` : selectedProgja.notesFromKetua,
+                              updatedAt: new Date().toISOString().split('T')[0],
+                            };
+                            onSaveProgja(updated);
+                            onAddNotification(`Permintaan penghapusan untuk progja "${selectedProgja.title}" DITOLAK oleh Ketua. Status dikembalikan ke DISETUJUI.`, 'info');
+                            setReviewComment('');
+                            setSelectedProgja(updated);
+                          }}
+                          className="px-3 py-1.5 bg-slate-600 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          Tolak Penghapusan
+                        </button>
+                        <button
+                          onClick={() => {
+                            // Approve Deletion -> Call onDeleteProgja
+                            if (confirm(`Apakah Anda (Ketua) yakin menyetujui penghapusan program "${selectedProgja.title}" secara permanen?`)) {
+                              onDeleteProgja(selectedProgja.id);
+                              onAddNotification(`Penghapusan program "${selectedProgja.title}" berhasil disetujui secara permanen oleh Ketua Koperasi.`, 'success');
+                              setReviewComment('');
+                              setSelectedProgja(null);
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Setujui & Hapus Permanen
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-rose-600 italic">
+                        *Menunggu Ketua Koperasi memvalidasi dan menyetujui permintaan penghapusan program kerja ini.
                       </p>
                     )}
                   </div>

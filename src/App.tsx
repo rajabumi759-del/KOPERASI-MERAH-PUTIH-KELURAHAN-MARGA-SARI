@@ -490,8 +490,7 @@ export default function App() {
   };
 
   return (
-    <GoogleOAuthProvider clientId={(import.meta as any).env.VITE_GOOGLE_CLIENT_ID || ''}>
-      <div className="min-h-screen bg-slate-50 font-sans text-slate-800 antialiased flex flex-col justify-between">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 antialiased flex flex-col justify-between">
       
       {/* GLOBAL HEADER & NAVIGATION NAVBAR */}
       <header className="sticky top-0 z-40 bg-red-700 border-b border-red-800 px-4 sm:px-6 lg:px-8 py-3.5 shadow-md">
@@ -874,6 +873,5 @@ export default function App() {
         </AnimatePresence>
       </div>
     </div>
-  </GoogleOAuthProvider>
-);
+  );
 }
