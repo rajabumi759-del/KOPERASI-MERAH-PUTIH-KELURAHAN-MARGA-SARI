@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Koperasi Digital",
+  "description": "Portal depan publik dan dasbor pengelolaan program kerja (progja) pengurus koperasi berbasis hak akses.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
