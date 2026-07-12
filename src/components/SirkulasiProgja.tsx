@@ -131,6 +131,28 @@ export default function SirkulasiProgja({
     setEditingId(null);
   };
 
+  // Export Program Kerja as CSV Spreadsheet
+  const handleExportProgjaCSV = () => {
+    try {
+      const headers = 'ID,Nama Progja,PIC,Sektor,Tanggal Target,Anggaran,Sumber Dana,Status,Indikator Keberhasilan\n';
+      const csvContent = progjaList.map(p => 
+        `"${p.id}","${p.title.replace(/"/g, '""')}","${p.picName}","${p.sector}","${p.targetDate}","${p.budget}","${p.fundingSource || ''}","${p.status}","${(p.indicators || '').replace(/"/g, '""')}"`
+      ).join('\n');
+      
+      const blob = new Blob([headers + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Rekap_Progja_Koperasi_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      onAddNotification('Berhasil mengunduh rekap Program Kerja (CSV Spreadsheet)', 'success');
+    } catch (err) {
+      onAddNotification('Gagal mengunduh rekap program kerja CSV', 'danger');
+    }
+  };
+
   // Handle new progja creation (Draft)
   const handleCreateProgja = (status: ProgjaStatus) => {
     if (!newTitle || !newTargetDate || !newBudget) {
@@ -563,20 +585,30 @@ export default function SirkulasiProgja({
       </div>
 
       {/* Tabs Filter */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-slate-200">
-        {['SEMUA', 'DRAFT', 'DIAJUKAN', 'REVISI', 'DISETUJUI', 'DILAKSANAKAN', 'MENUNGGU_VALIDASI', 'DIPUBLIKASIKAN', 'MENUNGGU_VALIDASI_PENGHAPUSAN'].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
-              activeTab === tab
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-            }`}
-          >
-            {tab === 'SEMUA' ? 'Semua Status' : tab === 'MENUNGGU_VALIDASI' ? 'Menunggu Validasi' : tab === 'MENUNGGU_VALIDASI_PENGHAPUSAN' ? 'Minta Hapus' : tab}
-          </button>
-        ))}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
+        <div className="flex items-center gap-1.5 overflow-x-auto">
+          {['SEMUA', 'DRAFT', 'DIAJUKAN', 'REVISI', 'DISETUJUI', 'DILAKSANAKAN', 'MENUNGGU_VALIDASI', 'DIPUBLIKASIKAN', 'MENUNGGU_VALIDASI_PENGHAPUSAN'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
+                activeTab === tab
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              {tab === 'SEMUA' ? 'Semua Status' : tab === 'MENUNGGU_VALIDASI' ? 'Menunggu Validasi' : tab === 'MENUNGGU_VALIDASI_PENGHAPUSAN' ? 'Minta Hapus' : tab}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={handleExportProgjaCSV}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold cursor-pointer transition-colors whitespace-nowrap shadow-xs"
+          title="Unduh Rekap Program Kerja Spreadsheet (CSV)"
+        >
+          <FileSpreadsheet className="w-3.5 h-3.5" />
+          Unduh Progja (CSV)
+        </button>
       </div>
 
       {/* Grid Layout of Progja list and Details */}

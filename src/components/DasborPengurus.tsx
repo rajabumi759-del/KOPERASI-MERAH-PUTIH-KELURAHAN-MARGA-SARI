@@ -38,6 +38,7 @@ import {
   BellOff,
   Clock,
   XCircle,
+  FileSpreadsheet,
 } from 'lucide-react';
 import {
   BarChart,
@@ -629,6 +630,28 @@ export default function DasborPengurus({
       action,
       description,
     };
+  };
+
+  // Handler to generate and download Monthly Financial Transaction CSV Spreadsheet Report
+  const handleDownloadKeuanganCSV = () => {
+    try {
+      const headers = 'ID,Tipe Transaksi,Kategori,Jumlah (IDR),Deskripsi,Tanggal,Pemohon,Status\n';
+      const csvContent = keuangan.transactions.map(t => 
+        `"${t.id}","${t.type === 'IN' ? 'Pemasukan/Kas Masuk' : 'Pengeluaran/Kas Keluar'}","${t.category}","${t.amount}","${(t.description || '').replace(/"/g, '""')}","${t.date}","${t.requester}","Disetujui"`
+      ).join('\n');
+      
+      const blob = new Blob([headers + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `Rekap_Keuangan_Koperasi_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      onAddNotification('Berhasil mengunduh rekap Transaksi Keuangan (CSV Spreadsheet)', 'success');
+    } catch (err) {
+      onAddNotification('Gagal mengunduh rekap keuangan CSV', 'danger');
+    }
   };
 
   // Handler to generate and download Monthly Financial Health PDF Report
@@ -2671,6 +2694,14 @@ export default function DasborPengurus({
                     >
                       <Download className="w-4 h-4" />
                       Unduh PDF Keuangan
+                    </button>
+                    <button
+                      onClick={handleDownloadKeuanganCSV}
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold cursor-pointer transition-colors shadow-2xs"
+                      title="Unduh Rekap Transaksi Keuangan Spreadsheet (CSV)"
+                    >
+                      <FileSpreadsheet className="w-4 h-4" />
+                      Unduh Spreadsheet (CSV)
                     </button>
                     <button
                       onClick={() => setShowAddTransaction(!showAddTransaction)}
