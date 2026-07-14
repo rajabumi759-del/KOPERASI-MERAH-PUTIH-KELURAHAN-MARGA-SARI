@@ -165,12 +165,193 @@ export default function App() {
         setCurrentUser(u);
         setActiveView('DASHBOARD');
       }
+
+      // Fetch latest global database state from Google Apps Script Web App (Cloud Storage)
+      const loadFromAppsScript = async () => {
+        try {
+          let state = null;
+          
+          // 1. Coba lewat local backend proxy dahulu (untuk AI Studio / Full-stack Node.js server)
+          try {
+            const res = await fetch('/api/apps-script/sync');
+            if (res.ok) {
+              const result = await res.json();
+              if (result.success && result.data) {
+                const remoteData = result.data;
+                state = remoteData.rawState || remoteData.database || remoteData.data?.rawState || remoteData.data || (typeof remoteData === 'object' && remoteData.biodata ? remoteData : null);
+              }
+            }
+          } catch (proxyErr) {
+            console.warn('Backend proxy GET tidak tersedia, beralih ke pengambilan langsung dari Cloud...', proxyErr);
+          }
+
+          // 2. Jika gagal atau sedang berjalan di XAMPP statis murni, lakukan pengambilan langsung ke Apps Script URL
+          if (!state) {
+            console.log('Menghubungi Cloud Google Apps Script secara langsung...');
+            const res = await fetch('https://script.google.com/macros/s/AKfycbyj08ugANkeB_i8zFwXZ4Ii1P-3xS_qekKq-6sAzuqPtB3cxMkJWhrlai-W76yhwiKE/exec', {
+              method: 'GET',
+              mode: 'cors'
+            });
+            if (res.ok) {
+              const remoteData = await res.json();
+              state = remoteData.rawState || remoteData.database || remoteData.data?.rawState || remoteData.data || (typeof remoteData === 'object' && remoteData.biodata ? remoteData : remoteData);
+            }
+          }
+
+          if (state && typeof state === 'object') {
+            if (state.biodata) {
+              setBiodata(state.biodata);
+              localStorage.setItem('koperasi_biodata', JSON.stringify(state.biodata));
+            }
+            if (state.newsList) {
+              setNewsList(state.newsList);
+              localStorage.setItem('koperasi_news', JSON.stringify(state.newsList));
+            }
+            if (state.progjaList) {
+              setProgjaList(state.progjaList);
+              localStorage.setItem('koperasi_progja', JSON.stringify(state.progjaList));
+            }
+            if (state.himbauanList) {
+              setHimbauanList(state.himbauanList);
+              localStorage.setItem('koperasi_himbauan', JSON.stringify(state.himbauanList));
+            }
+            if (state.keuangan) {
+              setKeuangan(state.keuangan);
+              localStorage.setItem('koperasi_keuangan', JSON.stringify(state.keuangan));
+            }
+            if (state.geraiList) {
+              setGeraiList(state.geraiList);
+              localStorage.setItem('koperasi_gerai', JSON.stringify(state.geraiList));
+            }
+            if (state.orgMembers) {
+              setOrgMembers(state.orgMembers);
+              localStorage.setItem('koperasi_members', JSON.stringify(state.orgMembers));
+            }
+            if (state.votingList) {
+              setVotingList(state.votingList);
+              localStorage.setItem('koperasi_voting', JSON.stringify(state.votingList));
+            }
+            if (state.activityLogs) {
+              setActivityLogs(state.activityLogs);
+              localStorage.setItem('koperasi_logs', JSON.stringify(state.activityLogs));
+            }
+            if (state.usersBase) {
+              setUsersBase(state.usersBase);
+              localStorage.setItem('koperasi_users_base', JSON.stringify(state.usersBase));
+            }
+            console.log('Database koperasi sinkron penuh dengan cloud Google Sheets!');
+          }
+        } catch (err) {
+          console.warn('Google Apps Script masih kosong atau offline, menggunakan penyimpanan perangkat lokal.', err);
+        }
+      };
+      loadFromAppsScript();
+
     } catch (e) {
       console.error('Gagal memuat database lokal koperasi:', e);
     }
 
     return () => clearInterval(interval);
   }, []);
+
+  // Helper to trigger automatic background sync to Google Apps Script Web App for every change
+  const triggerAppsScriptSync = async (updatedData: any) => {
+    try {
+      const currentBiodata = updatedData.biodata || biodata;
+      const currentProgja = updatedData.progjaList || progjaList;
+      const currentKeuangan = updatedData.keuangan || keuangan;
+      const currentNews = updatedData.newsList || newsList;
+      const currentMembers = updatedData.orgMembers || orgMembers;
+      const currentVoting = updatedData.votingList || votingList;
+      const currentGerai = updatedData.geraiList || geraiList;
+      const currentHimbauan = updatedData.himbauanList || himbauanList;
+      const currentLogs = updatedData.activityLogs || activityLogs;
+
+      // Create pre-formatted sheets table rows for easy spreadsheet injection
+      const sheetsFormat = {
+        Biodata: [
+          ['Name', 'Address', 'Phone', 'Email', 'Facebook', 'Instagram', 'Twitter', 'Youtube'],
+          [currentBiodata.name, currentBiodata.address, currentBiodata.phone, currentBiodata.email, currentBiodata.facebook, currentBiodata.instagram, currentBiodata.twitter, currentBiodata.youtube]
+        ],
+        Progja: [
+          ['ID', 'Title', 'PIC', 'Sector', 'Target Date', 'Budget', 'Status', 'Indikator Keberhasilan', 'Catatan'],
+          ...currentProgja.map((p: any) => [p.id, p.title, p.picName, p.sector, p.targetDate, p.budget, p.status, p.indicators || '', p.notesFromKetua || ''])
+        ],
+        Keuangan: [
+          ['ID', 'Type', 'Category', 'Amount', 'Description', 'Date', 'Requester'],
+          ...currentKeuangan.transactions.map((t: any) => [t.id, t.type, t.category, t.amount, t.description, t.date, t.requester])
+        ],
+        News: [
+          ['ID', 'Title', 'Date', 'Likes', 'Shares'],
+          ...currentNews.map((n: any) => [n.id, n.title, n.date, n.likes, n.shares])
+        ],
+        Members: [
+          ['ID', 'Name', 'Role', 'NIK', 'Phone'],
+          ...currentMembers.map((m: any) => [m.id, m.name, m.role, m.nik, m.phone])
+        ],
+        Voting: [
+          ['ID', 'Title', 'Description', 'Status', 'Setuju', 'Tolak', 'Abstain'],
+          ...currentVoting.map((v: any) => [v.id, v.title, v.description, v.status, v.votes?.SETUJU || 0, v.votes?.TOLAK || 0, v.votes?.ABSTAIN || 0])
+        ],
+        Gerai: [
+          ['ID', 'Name', 'Category', 'Status', 'Revenue', 'Profit', 'Manager'],
+          ...currentGerai.map((g: any) => [g.id, g.name, g.category, g.status, g.monthlyRevenue || 0, g.monthlyProfit || 0, g.manager || ''])
+        ]
+      };
+
+      const payload = {
+        timestamp: new Date().toISOString(),
+        event: 'DATABASE_CHANGE',
+        updatedFields: Object.keys(updatedData),
+        updatedData: updatedData,
+        sheetsFormat: sheetsFormat,
+        rawState: {
+          biodata: currentBiodata,
+          progjaList: currentProgja,
+          keuangan: currentKeuangan,
+          newsList: currentNews,
+          orgMembers: currentMembers,
+          votingList: currentVoting,
+          geraiList: currentGerai,
+          himbauanList: currentHimbauan,
+          activityLogs: currentLogs
+        }
+      };
+
+      // Coba lewat local backend proxy dahulu
+      let synced = false;
+      try {
+        const response = await fetch('/api/apps-script/sync', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+        if (response.ok) {
+          synced = true;
+          console.log('Sinkronisasi berhasil lewat backend proxy.');
+        }
+      } catch (proxyError) {
+        console.warn('Backend proxy tidak tersedia, mencoba kirim data langsung ke cloud Google Sheets...');
+      }
+
+      // Jika gagal/sedang di XAMPP, langsung kirim langsung dari browser dengan Content-Type: text/plain
+      if (!synced) {
+        await fetch('https://script.google.com/macros/s/AKfycbyj08ugANkeB_i8zFwXZ4Ii1P-3xS_qekKq-6sAzuqPtB3cxMkJWhrlai-W76yhwiKE/exec', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/plain'
+          },
+          body: JSON.stringify(payload),
+          mode: 'cors'
+        });
+        console.log('Sinkronisasi berhasil dikirim langsung ke Google Sheets!');
+      }
+    } catch (error) {
+      console.error('Gagal melakukan sinkronisasi otomatis ke Google Apps Script:', error);
+    }
+  };
 
   // Sync to local storage on any state change
   const saveAppState = (updatedData: Partial<{
@@ -246,6 +427,10 @@ export default function App() {
         setVotingList(updatedData.votingList);
         localStorage.setItem('koperasi_voting', JSON.stringify(updatedData.votingList));
       }
+
+      // Trigger background sync to Google Apps Script for every state update
+      triggerAppsScriptSync(updatedData);
+
     } catch (e) {
       console.error('Gagal menulis database lokal koperasi:', e);
     }

@@ -27,6 +27,65 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
+  // Proxy to Google Apps Script Web App (Redirects and CORS resolved server-side)
+  app.get("/api/apps-script/sync", async (req, res) => {
+    try {
+      const appsScriptUrl = "https://script.google.com/macros/s/AKfycbyj08ugANkeB_i8zFwXZ4Ii1P-3xS_qekKq-6sAzuqPtB3cxMkJWhrlai-W76yhwiKE/exec";
+      const response = await fetch(appsScriptUrl, {
+        method: "GET",
+      });
+
+      const text = await response.text();
+      let responseData;
+      try {
+        responseData = JSON.parse(text);
+      } catch (e) {
+        responseData = { message: text };
+      }
+
+      res.json({
+        success: true,
+        status: response.status,
+        data: responseData
+      });
+    } catch (error: any) {
+      console.error("Apps Script Web App Proxy GET Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/apps-script/sync", async (req, res) => {
+    try {
+      const payload = req.body;
+      const appsScriptUrl = "https://script.google.com/macros/s/AKfycbyj08ugANkeB_i8zFwXZ4Ii1P-3xS_qekKq-6sAzuqPtB3cxMkJWhrlai-W76yhwiKE/exec";
+      
+      const response = await fetch(appsScriptUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const text = await response.text();
+      let responseData;
+      try {
+        responseData = JSON.parse(text);
+      } catch (e) {
+        responseData = { message: text };
+      }
+
+      res.json({
+        success: true,
+        status: response.status,
+        data: responseData
+      });
+    } catch (error: any) {
+      console.error("Apps Script Web App Proxy Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Proxy for Google Sheets operations
   // We expect the client to send the access token in the headers
   app.post("/api/sheets/sync", async (req, res) => {

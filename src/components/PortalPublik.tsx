@@ -675,15 +675,15 @@ export default function PortalPublik({
               exit={{ opacity: 0, y: -10 }}
               className="space-y-6"
             >
-              {progjaList.filter((p) => p.status === 'DIPUBLIKASIKAN').length === 0 ? (
+              {progjaList.filter((p) => ['DISETUJUI', 'DILAKSANAKAN', 'DIPUBLIKASIKAN'].includes(p.status)).length === 0 ? (
                 <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                  <p className="text-sm text-slate-500 font-medium">Belum ada Program Kerja resmi yang divalidasi Ketua dan dipublikasikan.</p>
-                  <p className="text-xs text-slate-400 mt-1">Seluruh program kerja yang masuk tahap akhir sirkulasi akan tayang di sini.</p>
+                  <p className="text-sm text-slate-500 font-medium">Belum ada Program Kerja resmi yang disetujui atau dipublikasikan.</p>
+                  <p className="text-xs text-slate-400 mt-1">Seluruh program kerja yang disetujui Ketua, sedang berjalan, atau telah dipublikasikan akan tayang di sini.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {progjaList
-                    .filter((p) => p.status === 'DIPUBLIKASIKAN')
+                    .filter((p) => ['DISETUJUI', 'DILAKSANAKAN', 'DIPUBLIKASIKAN'].includes(p.status))
                     .map((p) => (
                       <div
                         key={p.id}
@@ -691,9 +691,26 @@ export default function PortalPublik({
                       >
                         {/* Top Indicator */}
                         <div className="flex items-center justify-between">
-                          <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-100 rounded-lg text-[10px] font-bold uppercase tracking-wider">
-                            Bidang: {p.sector}
-                          </span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-100 rounded-lg text-[10px] font-bold uppercase tracking-wider">
+                              Bidang: {p.sector}
+                            </span>
+                            {p.status === 'DISETUJUI' && (
+                              <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 rounded-md text-[9px] font-bold uppercase tracking-wider">
+                                DISETUJUI KETUA
+                              </span>
+                            )}
+                            {p.status === 'DILAKSANAKAN' && (
+                              <span className="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-100 rounded-md text-[9px] font-bold uppercase tracking-wider animate-pulse">
+                                SEDANG DIJALANKAN
+                              </span>
+                            )}
+                            {p.status === 'DIPUBLIKASIKAN' && (
+                              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-md text-[9px] font-bold uppercase tracking-wider">
+                                SELESAI & TERPUBLISH
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2">
                             <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-extrabold">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>

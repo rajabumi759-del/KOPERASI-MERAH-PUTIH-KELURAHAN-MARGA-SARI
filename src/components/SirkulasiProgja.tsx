@@ -530,8 +530,8 @@ export default function SirkulasiProgja({
           </p>
         </div>
 
-        {/* Anyone except Ketua & Pengawas can draft. Admin can do anything. */}
-        {currentUser.role !== 'pengawas' && currentUser.role !== 'ketua' ? (
+        {/* Anyone except Pengawas can draft/create. Admin and Ketua have full access. */}
+        {currentUser.role !== 'pengawas' ? (
           <button
             onClick={() => {
               resetForm();
@@ -1060,7 +1060,7 @@ export default function SirkulasiProgja({
                 {canModifyProgja(selectedProgja) && ['DRAFT', 'REVISI'].includes(selectedProgja.status) && (
                   <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200/80">
                     <div className="text-xs text-slate-600 text-left">
-                      Progja berstatus <span className="font-bold">{selectedProgja.status}</span>. Kirimkan atau perbarui draf ini sebelum diajukan ke Ketua.
+                      Progja berstatus <span className="font-bold">{selectedProgja.status}</span>. Perbarui draf ini, ajukan ke Ketua, atau setujui langsung.
                     </div>
                     <div className="flex items-center gap-2">
                       <button
@@ -1084,9 +1084,24 @@ export default function SirkulasiProgja({
                       </button>
                       <button
                         onClick={() => handleSubmitToKetua(selectedProgja)}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                        className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
                       >
-                        Ajukan ke Ketua
+                        Kirim untuk Validasi
+                      </button>
+                      <button
+                        onClick={() => {
+                          const updated: Progja = {
+                            ...selectedProgja,
+                            status: 'DISETUJUI',
+                            updatedAt: new Date().toISOString().split('T')[0],
+                          };
+                          onSaveProgja(updated);
+                          onAddNotification(`Progja "${selectedProgja.title}" berhasil disetujui langsung!`, 'success');
+                          setSelectedProgja(updated);
+                        }}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                      >
+                        Setujui Langsung
                       </button>
                     </div>
                   </div>
@@ -1096,7 +1111,7 @@ export default function SirkulasiProgja({
                 {canModifyProgja(selectedProgja) && ['DIAJUKAN', 'MENUNGGU_VALIDASI'].includes(selectedProgja.status) && (
                   <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-blue-50/40 rounded-xl border border-blue-200/80">
                     <div className="text-xs text-blue-800 text-left">
-                      Progja sedang <span className="font-bold">{selectedProgja.status === 'MENUNGGU_VALIDASI' ? 'MENUNGGU VALIDASI KETUA' : 'DITINJAU KETUA'}</span>. Anda tetap dapat mengedit draf ini untuk menyempurnakan rincian data jika diperlukan.
+                      Progja sedang <span className="font-bold">{selectedProgja.status === 'MENUNGGU_VALIDASI' ? 'MENUNGGU VALIDASI' : 'DITINJAU'}</span>. Anda dapat mengedit detail draf atau langsung menyetujuinya sendiri.
                     </div>
                     <div className="flex items-center gap-2">
                       <button
@@ -1117,6 +1132,21 @@ export default function SirkulasiProgja({
                         className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
                       >
                         Edit Detail Draft
+                      </button>
+                      <button
+                        onClick={() => {
+                          const updated: Progja = {
+                            ...selectedProgja,
+                            status: 'DISETUJUI',
+                            updatedAt: new Date().toISOString().split('T')[0],
+                          };
+                          onSaveProgja(updated);
+                          onAddNotification(`Progja "${selectedProgja.title}" berhasil disetujui langsung!`, 'success');
+                          setSelectedProgja(updated);
+                        }}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                      >
+                        Setujui Langsung
                       </button>
                     </div>
                   </div>
@@ -1751,26 +1781,15 @@ export default function SirkulasiProgja({
                 </span>
                 <div className="flex items-center gap-2">
                   {isEditMode && editingId && progjaList.find((p) => p.id === editingId) && !['DRAFT', 'REVISI', 'DIAJUKAN', 'MENUNGGU_VALIDASI'].includes(progjaList.find((p) => p.id === editingId)!.status) ? (
-                    currentUser.role === 'ketua' || currentUser.role === 'admin_master' ? (
-                      <button
-                        onClick={() => {
-                          const orig = progjaList.find((p) => p.id === editingId)!;
-                          handleCreateProgja(orig.status);
-                        }}
-                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
-                      >
-                        Simpan Perubahan & Publikasikan
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          handleCreateProgja('MENUNGGU_VALIDASI');
-                        }}
-                        className="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer animate-pulse"
-                      >
-                        Simpan & Ajukan Validasi Ketua
-                      </button>
-                    )
+                    <button
+                      onClick={() => {
+                        const orig = progjaList.find((p) => p.id === editingId)!;
+                        handleCreateProgja(orig.status);
+                      }}
+                      className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
+                    >
+                      Simpan Perubahan & Terapkan
+                    </button>
                   ) : (
                     <>
                       <button
@@ -1779,21 +1798,18 @@ export default function SirkulasiProgja({
                       >
                         Simpan Draft
                       </button>
-                      {currentUser.role === 'ketua' || currentUser.role === 'admin_master' ? (
-                        <button
-                          onClick={() => handleCreateProgja('DIAJUKAN')}
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs cursor-pointer"
-                        >
-                          Kirim ke Ketua
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleCreateProgja('MENUNGGU_VALIDASI')}
-                          className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-semibold shadow-xs cursor-pointer"
-                        >
-                          Kirim untuk Validasi Ketua
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleCreateProgja('MENUNGGU_VALIDASI')}
+                        className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold shadow-xs cursor-pointer"
+                      >
+                        Kirim untuk Validasi
+                      </button>
+                      <button
+                        onClick={() => handleCreateProgja('DISETUJUI')}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs cursor-pointer"
+                      >
+                        Simpan & Setujui Langsung
+                      </button>
                     </>
                   )}
                 </div>
