@@ -163,6 +163,167 @@ export default function DasborPengurus({
   // State of the active menu tab
   const [activeMenu, setActiveMenu] = useState<string>(allowedMenus[0]?.key || 'dashboard_pengurus');
 
+  // Database integration testing states
+  const [testSyncStatus, setTestSyncStatus] = useState<'IDLE' | 'PREPARING' | 'SENDING' | 'SUCCESS' | 'ERROR'>('IDLE');
+  const [testSyncMessage, setTestSyncMessage] = useState<string>('');
+
+  const handleDatabaseTestAndAutoPopulate = async () => {
+    try {
+      setTestSyncStatus('PREPARING');
+      setTestSyncMessage('Menyiapkan data program kerja (Progja) dan transaksi baru secara otomatis...');
+      
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      
+      const uniqueId1 = Math.floor(1000 + Math.random() * 9000);
+      const uniqueId2 = Math.floor(1000 + Math.random() * 9000);
+      
+      const newTestProgjas: Progja[] = [
+        ...progjaList,
+        {
+          id: `PRJ-TEST-${uniqueId1}`,
+          title: 'Renovasi Interior Toko Koperasi Unit 2',
+          picNik: currentUser.nik || '999912345',
+          picName: currentUser.name,
+          picRole: currentUser.role,
+          sector: 'Unit Usaha',
+          targetDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          budget: 15000000,
+          fundingSource: 'Modal Sendiri / Koperasi',
+          indicators: 'Interior selesai di-cat, pemasangan rak display baru, pencahayaan modern.',
+          description: 'Renovasi fisik dan perbaikan tata letak rak gerai Unit Usaha Koperasi Unit 2.',
+          collaborators: [],
+          status: 'DISETUJUI',
+          notesFromKetua: 'Telah divalidasi dan disetujui langsung oleh pengurus.',
+          createdAt: new Date().toISOString().split('T')[0],
+          updatedAt: new Date().toISOString().split('T')[0],
+        },
+        {
+          id: `PRJ-TEST-${uniqueId2}`,
+          title: 'Pengadaan Mesin Kasir & Barcode Scanner Pintar',
+          picNik: currentUser.nik || '999912345',
+          picName: currentUser.name,
+          picRole: currentUser.role,
+          sector: 'Teknologi Informasi',
+          targetDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          budget: 4500000,
+          fundingSource: 'Anggaran IT / Sarana',
+          indicators: '3 Unit POS mesin kasir terpasang di Gerai Koperasi utama.',
+          description: 'Penyediaan hardware kasir modern guna mempercepat antrean transaksi.',
+          collaborators: [],
+          status: 'DILAKSANAKAN',
+          notesFromKetua: 'Langsung dieksekusi demi meningkatkan kecepatan layanan transaksi.',
+          createdAt: new Date().toISOString().split('T')[0],
+          updatedAt: new Date().toISOString().split('T')[0],
+        }
+      ];
+
+      const newTransactions = [
+        ...keuangan.transactions,
+        {
+          id: `TX-TEST-${uniqueId1}`,
+          type: 'OUT' as const,
+          category: 'Peralatan Kantor',
+          amount: 4500000,
+          description: 'Pembelian 3 Unit Mesin Kasir Baru (Otomatis Test)',
+          date: new Date().toISOString().split('T')[0],
+          requester: currentUser.name,
+        }
+      ];
+
+      const updatedState = {
+        progjaList: newTestProgjas,
+        keuangan: {
+          ...keuangan,
+          transactions: newTransactions,
+          totalCash: (keuangan.totalCash || 0) - 4500000,
+          budgetUsed: (keuangan.budgetUsed || 0) + 4500000,
+        },
+        activityLogs: [
+          {
+            id: `LOG-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            userName: currentUser.name,
+            userRole: currentUser.role,
+            action: 'Uji Coba Auto-Populate Database & Google Sheets',
+            details: 'Berhasil menambahkan 2 Program Kerja baru dan 1 Transaksi keuangan untuk pengujian.',
+          },
+          ...activityLogs,
+        ]
+      };
+
+      setTestSyncStatus('SENDING');
+      setTestSyncMessage('Mengirimkan payload data lengkap ke Google Apps Script Web App...');
+
+      // Update local state (this will automatically trigger App.tsx's triggerAppsScriptSync)
+      onUpdateState(updatedState);
+
+      // We will perform a manual ping fetch to test and display the direct HTTP response to the user
+      const payload = {
+        timestamp: new Date().toISOString(),
+        event: 'DATABASE_CHANGE',
+        updatedFields: ['progjaList', 'keuangan', 'activityLogs'],
+        updatedData: updatedState,
+        sheetsFormat: {
+          Biodata: [
+            ['Name', 'Address', 'Phone', 'Email', 'Facebook', 'Instagram', 'Twitter', 'Youtube'],
+            [biodata.name, biodata.address, biodata.phone, biodata.email, biodata.facebook, biodata.instagram, biodata.twitter, biodata.youtube]
+          ],
+          Progja: [
+            ['ID', 'Title', 'PIC', 'Sector', 'Target Date', 'Budget', 'Status', 'Indikator Keberhasilan', 'Catatan'],
+            ...newTestProgjas.map((p: any) => [p.id, p.title, p.picName, p.sector, p.targetDate, p.budget, p.status, p.indicators || '', p.notesFromKetua || ''])
+          ],
+          Keuangan: [
+            ['ID', 'Type', 'Category', 'Amount', 'Description', 'Date', 'Requester'],
+            ...newTransactions.map((t: any) => [t.id, t.type, t.category, t.amount, t.description, t.date, t.requester])
+          ]
+        },
+        rawState: {
+          biodata: biodata,
+          progjaList: newTestProgjas,
+          keuangan: {
+            ...keuangan,
+            transactions: newTransactions,
+            totalCash: (keuangan.totalCash || 0) - 4500000,
+            budgetUsed: (keuangan.budgetUsed || 0) + 4500000,
+          },
+          newsList: newsList,
+          orgMembers: orgMembers,
+          votingList: votingList,
+          geraiList: geraiList,
+          himbauanList: himbauanList,
+          activityLogs: updatedState.activityLogs
+        }
+      };
+
+      const res = await fetch('/api/apps-script/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        if (result.success) {
+          setTestSyncStatus('SUCCESS');
+          setTestSyncMessage('Berhasil! Data koperasi berhasil diisi secara otomatis dan disinkronkan ke Spreadsheet Anda secara real-time!');
+          onAddNotification('Database Google Sheets berhasil diisi secara otomatis!', 'success');
+        } else {
+          throw new Error(result.error || 'Gagal menyimpan data di Spreadsheet.');
+        }
+      } else {
+        throw new Error(`HTTP Error: ${res.status}`);
+      }
+
+    } catch (err: any) {
+      console.error(err);
+      setTestSyncStatus('ERROR');
+      setTestSyncMessage(`Gagal melakukan uji sinkronisasi: ${err.message || err}. Pastikan Web App URL Anda sudah benar dan memiliki akses 'Anyone'.`);
+      onAddNotification('Uji sinkronisasi gagal!', 'warning');
+    }
+  };
+
   // Synchronize active tab menu with external routing trigger from public screen
   React.useEffect(() => {
     if (autoSelectProgjaId) {
@@ -4771,21 +4932,90 @@ export default function DasborPengurus({
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-6"
               >
+                {/* 1. AUTO-POPULATE & CONNECTION TESTING PANEL */}
+                <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-red-50 text-red-600 rounded-2xl">
+                      <FileSpreadsheet className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900">Uji Coba Database & Pengisian Otomatis</h3>
+                      <p className="text-xs text-slate-500">Klik tombol di bawah untuk membuat data demo secara otomatis, menguji respon REST API, dan mengkonfirmasi status database.</p>
+                    </div>
+                  </div>
+
+                  <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Status Pengujian</h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5">Uji coba ini akan memasukkan data program kerja (Progja) renovasi dan pengadaan fiktif, transaksi keuangan baru, lalu mengunggahnya ke Spreadsheet.</p>
+                      </div>
+                      <button
+                        onClick={handleDatabaseTestAndAutoPopulate}
+                        disabled={testSyncStatus === 'PREPARING' || testSyncStatus === 'SENDING'}
+                        className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-black shadow-md shadow-emerald-200 cursor-pointer flex items-center gap-2 transition-all self-start sm:self-center"
+                      >
+                        {testSyncStatus === 'PREPARING' || testSyncStatus === 'SENDING' ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            Sedang Memproses...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCheck className="w-4 h-4" />
+                            Isi Otomatis & Uji Database Sekarang
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Progress States */}
+                    {testSyncStatus !== 'IDLE' && (
+                      <div className={`p-4 rounded-xl text-xs font-medium border ${
+                        testSyncStatus === 'PREPARING' ? 'bg-blue-50/50 text-blue-700 border-blue-100' :
+                        testSyncStatus === 'SENDING' ? 'bg-amber-50/50 text-amber-700 border-amber-100' :
+                        testSyncStatus === 'SUCCESS' ? 'bg-emerald-50 text-emerald-800 border-emerald-100' :
+                        'bg-red-50 text-red-800 border-red-100'
+                      }`}>
+                        <div className="flex items-start gap-2.5">
+                          {testSyncStatus === 'SUCCESS' ? (
+                            <span className="text-lg">✅</span>
+                          ) : testSyncStatus === 'ERROR' ? (
+                            <span className="text-lg">❌</span>
+                          ) : (
+                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mt-0.5" />
+                          )}
+                          <div>
+                            <p className="font-bold">
+                              {testSyncStatus === 'PREPARING' && 'Langkah 1/2: Menyiapkan Data Koperasi...'}
+                              {testSyncStatus === 'SENDING' && 'Langkah 2/2: Menyinkronkan Data Melalui Web App...'}
+                              {testSyncStatus === 'SUCCESS' && 'Uji Coba Berhasil! Database Aktif & Responsif'}
+                              {testSyncStatus === 'ERROR' && 'Koneksi Gagal / Tertunda'}
+                            </p>
+                            <p className="text-[11px] opacity-90 mt-1 leading-relaxed">{testSyncMessage}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. SYNC SETTINGS */}
                 <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
                   <div className="flex items-center gap-3 mb-6">
                     <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
                       <FileCheck2 className="w-6 h-6" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-bold text-slate-900">Sinkronisasi Google Sheets</h3>
-                      <p className="text-xs text-slate-500">Gunakan Google Sheets sebagai database cadangan dan untuk pelaporan real-time.</p>
+                      <h3 className="text-lg font-bold text-slate-900">Konfigurasi Sinkronisasi Spreadsheet</h3>
+                      <p className="text-xs text-slate-500">Gunakan Google Sheets sebagai penyimpanan cloud database utama Anda untuk kolaborasi multi-user.</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-4">
                       <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
-                        <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Status Koneksi</h4>
+                        <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Status Koneksi Akun Google</h4>
                         
                         {!googleAccessToken ? (
                           <button
@@ -4793,7 +5023,7 @@ export default function DasborPengurus({
                             className="w-full py-3 bg-white border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50 text-slate-700 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer"
                           >
                             <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="Google" />
-                            Hubungkan Akun Google
+                            Hubungkan Akun Google (Optional)
                           </button>
                         ) : (
                           <div className="flex items-center justify-between p-3 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100">
@@ -4843,8 +5073,8 @@ export default function DasborPengurus({
                       </div>
 
                       <button
-                        disabled={!googleAccessToken || !systemSettings.spreadsheetId || isSyncing}
-                        onClick={() => googleAccessToken && systemSettings.spreadsheetId && onSyncNow(googleAccessToken, systemSettings.spreadsheetId)}
+                        disabled={!systemSettings.spreadsheetId || isSyncing}
+                        onClick={() => systemSettings.spreadsheetId && onSyncNow(googleAccessToken || 'web-app-sync', systemSettings.spreadsheetId)}
                         className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white rounded-xl text-sm font-bold shadow-lg shadow-emerald-200 transition-all cursor-pointer flex items-center justify-center gap-2"
                       >
                         {isSyncing ? (
@@ -4855,30 +5085,200 @@ export default function DasborPengurus({
                         ) : (
                           <>
                             <UploadCloud className="w-4 h-4" />
-                            Sinkronkan Sekarang
+                            Paksa Sinkronisasi Sekarang
                           </>
                         )}
                       </button>
                     </div>
 
+                    {/* Instruction guide */}
                     <div className="bg-slate-900 rounded-3xl p-6 text-slate-300 space-y-4">
                       <h4 className="text-sm font-bold text-white flex items-center gap-2">
                         <Info className="w-4 h-4 text-emerald-400" />
-                        Cara Penggunaan
+                        Panduan Setup & Hosting Database
                       </h4>
                       <ol className="text-xs space-y-3 list-decimal list-inside text-slate-400 leading-relaxed">
-                        <li>Buat Spreadsheet baru di Google Drive Anda.</li>
+                        <li>Buat Spreadsheet baru di akun Google Drive Anda.</li>
                         <li>Salin <span className="text-emerald-400 font-mono">ID Spreadsheet</span> dari URL browser Anda.</li>
-                        <li>Tempelkan ID tersebut ke kolom di samping.</li>
-                        <li>Klik "Hubungkan Akun Google" dan izinkan akses.</li>
-                        <li>Klik "Sinkronkan Sekarang" untuk membuat tab data pertama kali.</li>
-                        <li>Aktifkan "Auto-Sync" untuk pembaruan otomatis.</li>
+                        <li>Tempelkan ID tersebut ke kolom di samping kiri.</li>
+                        <li>Salin Kode Apps Script di bawah, lalu pasang pada spreadsheet Anda agar ter-hosting dan berfungsi bersama pengguna lain secara real-time.</li>
                       </ol>
                       <div className="pt-4 p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
-                        <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Penting</p>
-                        <p className="text-[10px] leading-normal italic">Pastikan Anda memiliki izin edit pada spreadsheet yang dituju.</p>
+                        <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Keunggulan Web App</p>
+                        <p className="text-[10px] leading-normal italic">Metode Web App ini memungkinkan database diakses secara bersama-sama oleh semua pengurus tanpa mengharuskan masing-masing mengaitkan akun Google-nya.</p>
                       </div>
                     </div>
+                  </div>
+                </div>
+
+                {/* 3. CODEBASE APPS SCRIPT FOR USER TO PASTE */}
+                <div className="bg-slate-900 rounded-3xl p-8 text-slate-100 border border-slate-800 space-y-4 text-left">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-black text-white">Kode Google Apps Script (`Code.gs`)</h4>
+                      <p className="text-[11px] text-slate-400">Tempelkan kode ini di spreadsheet Anda melalui menu <strong>Ekstensi &gt; Apps Script</strong>.</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const codeText = `function doGet(e) {
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var stateSheet = spreadsheet.getSheetByName("__system_state__");
+  var rawStateStr = "";
+  if (stateSheet) {
+    rawStateStr = stateSheet.getRange(1, 1).getValue();
+  }
+  
+  var response = {
+    success: true,
+    message: "Data retrieved successfully",
+    rawState: rawStateStr ? JSON.parse(rawStateStr) : null
+  };
+  
+  return ContentService.createTextOutput(JSON.stringify(response))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  try {
+    var payload = JSON.parse(e.postData.contents);
+    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // 1. Simpan sheetsFormat
+    if (payload.sheetsFormat) {
+      for (var tabName in payload.sheetsFormat) {
+        var rows = payload.sheetsFormat[tabName];
+        if (rows && rows.length > 0) {
+          var sheet = spreadsheet.getSheetByName(tabName);
+          if (!sheet) {
+            sheet = spreadsheet.insertSheet(tabName);
+          }
+          sheet.clear();
+          sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
+          
+          sheet.getRange(1, 1, 1, rows[0].length)
+            .setBackground("#059669")
+            .setFontColor("#FFFFFF")
+            .setFontWeight("bold")
+            .setHorizontalAlignment("center");
+          sheet.setFrozenRows(1);
+          sheet.autoResizeColumns(1, rows[0].length);
+        }
+      }
+    }
+    
+    // 2. Simpan rawState ke sheet __system_state__
+    if (payload.rawState) {
+      var stateSheet = spreadsheet.getSheetByName("__system_state__");
+      if (!stateSheet) {
+        stateSheet = spreadsheet.insertSheet("__system_state__");
+        stateSheet.hideSheet();
+      }
+      stateSheet.clear();
+      stateSheet.getRange(1, 1).setValue(JSON.stringify(payload.rawState));
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({
+      success: true,
+      message: "Database updated successfully"
+    })).setMimeType(ContentService.MimeType.JSON);
+    
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({
+      success: false,
+      error: error.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}`;
+                        navigator.clipboard.writeText(codeText);
+                        onAddNotification('Kode Apps Script berhasil disalin ke clipboard!', 'success');
+                      }}
+                      className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white rounded-xl border border-slate-700/80 cursor-pointer transition-colors"
+                    >
+                      Salin Kode Script
+                    </button>
+                  </div>
+
+                  <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 font-mono text-[11px] text-emerald-400 overflow-x-auto max-h-[320px] leading-relaxed">
+                    <pre>{`function doGet(e) {
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var stateSheet = spreadsheet.getSheetByName("__system_state__");
+  var rawStateStr = "";
+  if (stateSheet) {
+    rawStateStr = stateSheet.getRange(1, 1).getValue();
+  }
+  
+  var response = {
+    success: true,
+    message: "Data retrieved successfully",
+    rawState: rawStateStr ? JSON.parse(rawStateStr) : null
+  };
+  
+  return ContentService.createTextOutput(JSON.stringify(response))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  try {
+    var payload = JSON.parse(e.postData.contents);
+    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // 1. Simpan format tabel untuk tiap tab
+    if (payload.sheetsFormat) {
+      for (var tabName in payload.sheetsFormat) {
+        var rows = payload.sheetsFormat[tabName];
+        if (rows && rows.length > 0) {
+          var sheet = spreadsheet.getSheetByName(tabName);
+          if (!sheet) {
+            sheet = spreadsheet.insertSheet(tabName);
+          }
+          sheet.clear();
+          sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
+          
+          sheet.getRange(1, 1, 1, rows[0].length)
+            .setBackground("#059669") // Header warna hijau Emerald
+            .setFontColor("#FFFFFF")
+            .setFontWeight("bold")
+            .setHorizontalAlignment("center");
+          sheet.setFrozenRows(1);
+          sheet.autoResizeColumns(1, rows[0].length);
+        }
+      }
+    }
+    
+    // 2. Simpan cadangan JSON rawState lengkap koperasi ke sheet sistem tersembunyi
+    if (payload.rawState) {
+      var stateSheet = spreadsheet.getSheetByName("__system_state__");
+      if (!stateSheet) {
+        stateSheet = spreadsheet.insertSheet("__system_state__");
+        stateSheet.hideSheet();
+      }
+      stateSheet.clear();
+      stateSheet.getRange(1, 1).setValue(JSON.stringify(payload.rawState));
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({
+      success: true,
+      message: "Database updated successfully"
+    })).setMimeType(ContentService.MimeType.JSON);
+    
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({
+      success: false,
+      error: error.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}`}</pre>
+                  </div>
+
+                  <div className="p-4 bg-slate-800/25 rounded-2xl border border-slate-800 space-y-2">
+                    <h5 className="text-xs font-bold text-white uppercase tracking-wider">Langkah Deploy Web App di Spreadsheet:</h5>
+                    <ol className="text-xs space-y-1.5 list-decimal list-inside text-slate-400">
+                      <li>Di dalam Apps Script editor, klik tombol <strong>"Terapkan" (Deploy)</strong> &gt; <strong>"Penerapan Baru" (New deployment)</strong> di kanan atas.</li>
+                      <li>Pilih jenis penerapan: <strong>"Aplikasi Web" (Web app)</strong>.</li>
+                      <li>Setel <em>"Jalankan sebagai" (Execute as)</em> ke: <strong>"Saya" (Me)</strong>.</li>
+                      <li>Setel <em>"Siapa yang memiliki akses" (Who has access)</em> ke: <strong>"Siapa saja" (Anyone)</strong>.</li>
+                      <li>Klik <strong>"Terapkan"</strong>, berikan izin Google, lalu salin URL Aplikasi Web yang diberikan dan pasang di <code className="text-emerald-400 bg-slate-950 px-1 py-0.5 rounded">server.ts</code> atau gunakan langsung!</li>
+                    </ol>
                   </div>
                 </div>
               </motion.div>

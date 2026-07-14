@@ -30,7 +30,13 @@ async function startServer() {
   // Proxy to Google Apps Script Web App (Redirects and CORS resolved server-side)
   app.get("/api/apps-script/sync", async (req, res) => {
     try {
-      const appsScriptUrl = "https://script.google.com/macros/s/AKfycbyj08ugANkeB_i8zFwXZ4Ii1P-3xS_qekKq-6sAzuqPtB3cxMkJWhrlai-W76yhwiKE/exec";
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+
+      const queryParams = new URLSearchParams(req.query as any).toString();
+      const appsScriptUrl = `https://script.google.com/macros/s/AKfycbw653EClHJvik458bjxDnx4AbmCVIBBrO1cFn-I9YOToODFLzyNxf_1-dwQIR4BV7c4/exec${queryParams ? '?' + queryParams : ''}`;
+      
       const response = await fetch(appsScriptUrl, {
         method: "GET",
       });
@@ -57,7 +63,7 @@ async function startServer() {
   app.post("/api/apps-script/sync", async (req, res) => {
     try {
       const payload = req.body;
-      const appsScriptUrl = "https://script.google.com/macros/s/AKfycbyj08ugANkeB_i8zFwXZ4Ii1P-3xS_qekKq-6sAzuqPtB3cxMkJWhrlai-W76yhwiKE/exec";
+      const appsScriptUrl = "https://script.google.com/macros/s/AKfycbw653EClHJvik458bjxDnx4AbmCVIBBrO1cFn-I9YOToODFLzyNxf_1-dwQIR4BV7c4/exec";
       
       const response = await fetch(appsScriptUrl, {
         method: "POST",

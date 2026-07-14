@@ -110,6 +110,106 @@ export default function App() {
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [activatedUser, setActivatedUser] = useState<UserType | null>(null);
 
+  const [isAppsScriptLoading, setIsAppsScriptLoading] = useState(false);
+
+  // Fetch latest global database state from Google Apps Script Web App (Cloud Storage) with Cache-Buster
+  const loadFromAppsScript = async (silent = false) => {
+    if (!silent) {
+      setIsAppsScriptLoading(true);
+      addNotification('Sedang mengambil data terbaru dari Google Spreadsheet...', 'info');
+    }
+    try {
+      let state = null;
+      
+      // 1. Coba lewat local backend proxy dahulu (untuk AI Studio / Full-stack Node.js server)
+      try {
+        const res = await fetch(`/api/apps-script/sync?_t=${Date.now()}`);
+        if (res.ok) {
+          const result = await res.json();
+          if (result.success && result.data) {
+            const remoteData = result.data;
+            state = remoteData.rawState || remoteData.database || remoteData.data?.rawState || remoteData.data || (typeof remoteData === 'object' && remoteData.biodata ? remoteData : null);
+          }
+        }
+      } catch (proxyErr) {
+        console.warn('Backend proxy GET tidak tersedia, beralih ke pengambilan langsung dari Cloud...', proxyErr);
+      }
+
+      // 2. Jika gagal atau sedang berjalan di XAMPP statis murni, lakukan pengambilan langsung ke Apps Script URL
+      if (!state) {
+        console.log('Menghubungi Cloud Google Apps Script secara langsung...');
+        const res = await fetch(`https://script.google.com/macros/s/AKfycbyEi1gtrfgMclZkB-4kowHmwj22kM2c-sxrIzNHJYRBo-GTcfVh2KAnUcRQ_ugTECpT/exec?_t=${Date.now()}`, {
+          method: 'GET',
+          mode: 'cors'
+        });
+        if (res.ok) {
+          const remoteData = await res.json();
+          state = remoteData.rawState || remoteData.database || remoteData.data?.rawState || remoteData.data || (typeof remoteData === 'object' && remoteData.biodata ? remoteData : remoteData);
+        }
+      }
+
+      if (state && typeof state === 'object') {
+        if (state.biodata) {
+          setBiodata(state.biodata);
+          localStorage.setItem('koperasi_biodata', JSON.stringify(state.biodata));
+        }
+        if (state.newsList) {
+          setNewsList(state.newsList);
+          localStorage.setItem('koperasi_news', JSON.stringify(state.newsList));
+        }
+        if (state.progjaList) {
+          setProgjaList(state.progjaList);
+          localStorage.setItem('koperasi_progja', JSON.stringify(state.progjaList));
+        }
+        if (state.himbauanList) {
+          setHimbauanList(state.himbauanList);
+          localStorage.setItem('koperasi_himbauan', JSON.stringify(state.himbauanList));
+        }
+        if (state.keuangan) {
+          setKeuangan(state.keuangan);
+          localStorage.setItem('koperasi_keuangan', JSON.stringify(state.keuangan));
+        }
+        if (state.geraiList) {
+          setGeraiList(state.geraiList);
+          localStorage.setItem('koperasi_gerai', JSON.stringify(state.geraiList));
+        }
+        if (state.orgMembers) {
+          setOrgMembers(state.orgMembers);
+          localStorage.setItem('koperasi_members', JSON.stringify(state.orgMembers));
+        }
+        if (state.votingList) {
+          setVotingList(state.votingList);
+          localStorage.setItem('koperasi_voting', JSON.stringify(state.votingList));
+        }
+        if (state.activityLogs) {
+          setActivityLogs(state.activityLogs);
+          localStorage.setItem('koperasi_logs', JSON.stringify(state.activityLogs));
+        }
+        if (state.usersBase) {
+          setUsersBase(state.usersBase);
+          localStorage.setItem('koperasi_users_base', JSON.stringify(state.usersBase));
+        }
+        console.log('Database koperasi sinkron penuh dengan cloud Google Sheets!');
+        if (!silent) {
+          addNotification('Sinkronisasi database awan berhasil! Data terbaru telah dimuat dari Spreadsheet.', 'success');
+        }
+      } else {
+        if (!silent) {
+          addNotification('Database cloud terhubung, namun data kosong. Silakan isi data di Dasbor Pengurus.', 'info');
+        }
+      }
+    } catch (err) {
+      console.warn('Google Apps Script masih kosong atau offline, menggunakan penyimpanan perangkat lokal.', err);
+      if (!silent) {
+        addNotification('Gagal menghubungkan database awan. Silakan cek koneksi internet / Apps Script Anda.', 'warning');
+      }
+    } finally {
+      if (!silent) {
+        setIsAppsScriptLoading(false);
+      }
+    }
+  };
+
   // -----------------------------------------------------
   // LOAD & SAVE PERSISTENT DATA (LOCAL STORAGE)
   // -----------------------------------------------------
@@ -166,86 +266,8 @@ export default function App() {
         setActiveView('DASHBOARD');
       }
 
-      // Fetch latest global database state from Google Apps Script Web App (Cloud Storage)
-      const loadFromAppsScript = async () => {
-        try {
-          let state = null;
-          
-          // 1. Coba lewat local backend proxy dahulu (untuk AI Studio / Full-stack Node.js server)
-          try {
-            const res = await fetch('/api/apps-script/sync');
-            if (res.ok) {
-              const result = await res.json();
-              if (result.success && result.data) {
-                const remoteData = result.data;
-                state = remoteData.rawState || remoteData.database || remoteData.data?.rawState || remoteData.data || (typeof remoteData === 'object' && remoteData.biodata ? remoteData : null);
-              }
-            }
-          } catch (proxyErr) {
-            console.warn('Backend proxy GET tidak tersedia, beralih ke pengambilan langsung dari Cloud...', proxyErr);
-          }
-
-          // 2. Jika gagal atau sedang berjalan di XAMPP statis murni, lakukan pengambilan langsung ke Apps Script URL
-          if (!state) {
-            console.log('Menghubungi Cloud Google Apps Script secara langsung...');
-            const res = await fetch('https://script.google.com/macros/s/AKfycbyj08ugANkeB_i8zFwXZ4Ii1P-3xS_qekKq-6sAzuqPtB3cxMkJWhrlai-W76yhwiKE/exec', {
-              method: 'GET',
-              mode: 'cors'
-            });
-            if (res.ok) {
-              const remoteData = await res.json();
-              state = remoteData.rawState || remoteData.database || remoteData.data?.rawState || remoteData.data || (typeof remoteData === 'object' && remoteData.biodata ? remoteData : remoteData);
-            }
-          }
-
-          if (state && typeof state === 'object') {
-            if (state.biodata) {
-              setBiodata(state.biodata);
-              localStorage.setItem('koperasi_biodata', JSON.stringify(state.biodata));
-            }
-            if (state.newsList) {
-              setNewsList(state.newsList);
-              localStorage.setItem('koperasi_news', JSON.stringify(state.newsList));
-            }
-            if (state.progjaList) {
-              setProgjaList(state.progjaList);
-              localStorage.setItem('koperasi_progja', JSON.stringify(state.progjaList));
-            }
-            if (state.himbauanList) {
-              setHimbauanList(state.himbauanList);
-              localStorage.setItem('koperasi_himbauan', JSON.stringify(state.himbauanList));
-            }
-            if (state.keuangan) {
-              setKeuangan(state.keuangan);
-              localStorage.setItem('koperasi_keuangan', JSON.stringify(state.keuangan));
-            }
-            if (state.geraiList) {
-              setGeraiList(state.geraiList);
-              localStorage.setItem('koperasi_gerai', JSON.stringify(state.geraiList));
-            }
-            if (state.orgMembers) {
-              setOrgMembers(state.orgMembers);
-              localStorage.setItem('koperasi_members', JSON.stringify(state.orgMembers));
-            }
-            if (state.votingList) {
-              setVotingList(state.votingList);
-              localStorage.setItem('koperasi_voting', JSON.stringify(state.votingList));
-            }
-            if (state.activityLogs) {
-              setActivityLogs(state.activityLogs);
-              localStorage.setItem('koperasi_logs', JSON.stringify(state.activityLogs));
-            }
-            if (state.usersBase) {
-              setUsersBase(state.usersBase);
-              localStorage.setItem('koperasi_users_base', JSON.stringify(state.usersBase));
-            }
-            console.log('Database koperasi sinkron penuh dengan cloud Google Sheets!');
-          }
-        } catch (err) {
-          console.warn('Google Apps Script masih kosong atau offline, menggunakan penyimpanan perangkat lokal.', err);
-        }
-      };
-      loadFromAppsScript();
+      // Fetch on load (silent trigger)
+      loadFromAppsScript(true);
 
     } catch (e) {
       console.error('Gagal memuat database lokal koperasi:', e);
@@ -266,6 +288,7 @@ export default function App() {
       const currentGerai = updatedData.geraiList || geraiList;
       const currentHimbauan = updatedData.himbauanList || himbauanList;
       const currentLogs = updatedData.activityLogs || activityLogs;
+      const currentUsersBase = updatedData.usersBase || usersBase;
 
       // Create pre-formatted sheets table rows for easy spreadsheet injection
       const sheetsFormat = {
@@ -296,6 +319,10 @@ export default function App() {
         Gerai: [
           ['ID', 'Name', 'Category', 'Status', 'Revenue', 'Profit', 'Manager'],
           ...currentGerai.map((g: any) => [g.id, g.name, g.category, g.status, g.monthlyRevenue || 0, g.monthlyProfit || 0, g.manager || ''])
+        ],
+        Users: [
+          ['NIK', 'Name', 'Role', 'Registered', 'Password', 'PhotoUrl'],
+          ...currentUsersBase.map((u: any) => [u.nik, u.name, u.role, u.isRegistered ? 'TRUE' : 'FALSE', u.password || '', u.photoUrl || ''])
         ]
       };
 
@@ -314,7 +341,8 @@ export default function App() {
           votingList: currentVoting,
           geraiList: currentGerai,
           himbauanList: currentHimbauan,
-          activityLogs: currentLogs
+          activityLogs: currentLogs,
+          usersBase: currentUsersBase
         }
       };
 
@@ -338,7 +366,7 @@ export default function App() {
 
       // Jika gagal/sedang di XAMPP, langsung kirim langsung dari browser dengan Content-Type: text/plain
       if (!synced) {
-        await fetch('https://script.google.com/macros/s/AKfycbyj08ugANkeB_i8zFwXZ4Ii1P-3xS_qekKq-6sAzuqPtB3cxMkJWhrlai-W76yhwiKE/exec', {
+        await fetch('https://script.google.com/macros/s/AKfycbyEi1gtrfgMclZkB-4kowHmwj22kM2c-sxrIzNHJYRBo-GTcfVh2KAnUcRQ_ugTECpT/exec', {
           method: 'POST',
           headers: {
             'Content-Type': 'text/plain'
@@ -776,6 +804,8 @@ export default function App() {
                 onLoginClick={() => setActiveView('LOGIN')}
                 onNewsShare={handleNewsShare}
                 onNewsLike={handleNewsLike}
+                onRefresh={() => loadFromAppsScript(false)}
+                isRefreshing={isAppsScriptLoading}
               />
             </motion.div>
           )}
